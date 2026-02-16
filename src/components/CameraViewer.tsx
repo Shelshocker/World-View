@@ -1,4 +1,4 @@
-import { Camera, X, Globe, Play, Pause, Volume2, VolumeX, ExternalLink, MapPin, Loader2, AlertCircle } from 'lucide-react';
+import { Camera, X, Globe, Play, Pause, Volume2, VolumeX, ExternalLink, MapPin, AlertCircle } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { CameraStream } from '../data/cameraStreams';
 
@@ -9,18 +9,10 @@ interface CameraViewerProps {
 
 export function CameraViewer({ location, onClose }: CameraViewerProps) {
   const [isPlaying, setIsPlaying] = useState(true);
-  const [currentTime, setCurrentTime] = useState(new Date());
   const [isMuted, setIsMuted] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   useEffect(() => {
     setHasError(false);
@@ -36,9 +28,27 @@ export function CameraViewer({ location, onClose }: CameraViewerProps) {
     setHasError(true);
   };
 
+  // --- CRITICAL YOUTUBE FIX ---
+  // We extract the video ID and rebuild the URL with the 'origin' and 'enablejsapi' params.
+  // This tricks YouTube into thinking the request is coming from a standard web domain.
+  const getSecureUrl = (originalUrl: string) => {
+    if (!originalUrl.includes('youtube.com')) return originalUrl;
+    
+    const baseUrl = originalUrl.split('?')[0];
+    const params = new URLSearchParams();
+    params.set('autoplay', '1');
+    params.set('mute', isMuted ? '1' : '0');
+    params.set('enablejsapi', '1');
+    params.set('origin', 'https://www.youtube.com'); // Required for iOS
+    params.set('playsinline', '1');
+    params.set('rel', '0');
+    
+    return `${baseUrl}?${params.toString()}`;
+  };
+
   return (
     <div className="fixed inset-0 z-[100] bg-black flex flex-col animate-in fade-in zoom-in-95 duration-300">
-      {/* Immersive Header (Clean Display) */}
+      {/* Header */}
       <div className="absolute top-0 left-0 right-0 z-[110] p-6 pt-12 flex items-start justify-between bg-gradient-to-b from-black/90 via-black/40 to-transparent">
         <div className="flex gap-4">
           <div className="p-3 bg-indigo-500/20 rounded-2xl backdrop-blur-md border border-indigo-500/30">
@@ -68,7 +78,7 @@ export function CameraViewer({ location, onClose }: CameraViewerProps) {
         </button>
       </div>
 
-      {/* Main Fullscreen Player Area */}
+      {/* Main Player Area */}
       <div className="flex-1 relative bg-slate-950 flex items-center justify-center">
         {isLoading && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-slate-950">
@@ -84,8 +94,7 @@ export function CameraViewer({ location, onClose }: CameraViewerProps) {
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-12 text-center bg-slate-950">
             <AlertCircle size={48} className="text-red-500 mb-4" />
             <h3 className="text-white text-xl font-bold">Signal Lost</h3>
-            <p className="text-slate-400 mt-2 mb-8">Connection to {location.name} was interrupted.</p>
-            <button onClick={onClose} className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold">Return to Globe</button>
+            <button onClick={onClose} className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold mt-4">Return to Globe</button>
           </div>
         )}
 
@@ -103,9 +112,11 @@ export function CameraViewer({ location, onClose }: CameraViewerProps) {
           ) : (
             <iframe
               ref={iframeRef}
-              src={`${location.embedUrl}${location.embedUrl.includes('?') ? '&' : '?'}autoplay=1&mute=${isMuted ? 1 : 0}`}
+              src={getSecureUrl(location.embedUrl)}
               className="w-full h-full border-none pointer-events-auto"
-              allow="autoplay; fullscreen; encrypted-media"
+              // ADDED: Critical attributes for iOS YouTube compatibility
+              allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+              referrerPolicy="strict-origin-when-cross-origin" 
               onLoad={handleIframeLoad}
               onError={handleIframeError}
             />
@@ -113,7 +124,7 @@ export function CameraViewer({ location, onClose }: CameraViewerProps) {
         </div>
       </div>
 
-      {/* Control Bar (Floating Style) */}
+      {/* Control Bar */}
       <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-[110] px-6 py-4 bg-black/60 backdrop-blur-xl rounded-2xl border border-white/10 flex items-center gap-8 shadow-2xl">
         <div className="flex items-center gap-2">
           <button onClick={() => setIsPlaying(!isPlaying)} className="p-2 text-slate-300 hover:text-white transition-colors">

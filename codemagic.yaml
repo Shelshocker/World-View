@@ -10,7 +10,6 @@ workflows:
     scripts:
       - name: Install Dependencies
         script: |
-          # Use stable Capacitor 6 to match build machine capabilities
           npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/ios@6
           npm install
       - name: Web Assets Build
@@ -19,18 +18,22 @@ workflows:
           npm run build
       - name: Initialize and Sync iOS
         script: |
-          # Complete reset to avoid workspace conflicts
+          # Clean start
           rm -rf ios
           npx cap add ios
           npx cap sync ios
           
-          # Generate the essential .xcworkspace file
+          # FORCED PERMISSIONS: This tells iOS it is okay to play YouTube videos
+          /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" ios/App/App/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" ios/App/App/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoadsInWebContent bool true" ios/App/App/Info.plist || true
+          
+          # Generate the workspace
           cd ios/App
           pod install
       - name: iOS Build (Simulator version)
         script: |
           cd ios/App
-          # Target iPhone 17 as found in the server logs
           xcodebuild -workspace App.xcworkspace \
             -scheme App \
             -configuration Debug \
@@ -41,7 +44,5 @@ workflows:
             CODE_SIGNING_ALLOWED=NO \
             clean build
     artifacts:
-      # This captures the .app folder needed for the Appetize emulator
       - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
       - ios/App/build/Release-iphonesimulator/*.app
-      - /tmp/xcodebuild_logs/*.log
