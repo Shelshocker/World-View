@@ -11,18 +11,32 @@ workflows:
       - name: Install dependencies
         script: |
           npm install
+          # Force install Capacitor iOS platform
           npm install @capacitor/ios
       - name: Web Assets Build
         script: |
+          # FIX: Grant execution permissions to the Vite builder
+          chmod -R +x node_modules/.bin
           npm run build
       - name: Capacitor Sync
         script: |
-          npx cap add ios
+          # Sync the web code into the native iOS folder
+          npx cap add ios || true
           npx cap sync ios
       - name: iOS Build (Simulator version)
         script: |
+          # This builds a .app for testing. 
+          # Note: If you want a physical .ipa, you need Apple Developer Certificates.
           cd ios/App
-          xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 15'
+          xcodebuild -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'platform=iOS Simulator,name=iPhone 15' \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
     artifacts:
       - ios/App/build/Release-iphoneos/*.ipa
+      - ios/App/build/Release-iphonesimulator/*.app
       - /tmp/xcodebuild_logs/*.log
