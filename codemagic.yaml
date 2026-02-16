@@ -8,25 +8,28 @@ workflows:
       xcode: latest
       cocoapods: default
     scripts:
-      - name: Install dependencies
+      - name: Install Dependencies
         script: |
           npm install
-          # Force install Capacitor iOS platform
-          npm install @capacitor/ios
+          # Install Capacitor tools globally on the build machine
+          npm install -g @capacitor/cli
+          npm install @capacitor/core @capacitor/ios
       - name: Web Assets Build
         script: |
-          # FIX: Grant execution permissions to the Vite builder
+          # Grant permissions to build tools
           chmod -R +x node_modules/.bin
           npm run build
-      - name: Capacitor Sync
+      - name: Create iOS Project
         script: |
-          # Sync the web code into the native iOS folder
-          npx cap add ios || true
+          # Remove any existing iOS folder to prevent "Already Exists" errors
+          rm -rf ios
+          # Create a fresh iOS shell
+          npx cap add ios
+          # Inject the built website (dist folder) into the iOS shell
           npx cap sync ios
       - name: iOS Build (Simulator version)
         script: |
-          # This builds a .app for testing. 
-          # Note: If you want a physical .ipa, you need Apple Developer Certificates.
+          # Now we enter the folder created in the previous step
           cd ios/App
           xcodebuild -workspace App.xcworkspace \
             -scheme App \
@@ -37,6 +40,5 @@ workflows:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
     artifacts:
-      - ios/App/build/Release-iphoneos/*.ipa
       - ios/App/build/Release-iphonesimulator/*.app
       - /tmp/xcodebuild_logs/*.log
