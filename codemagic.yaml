@@ -10,7 +10,7 @@ workflows:
     scripts:
       - name: Install Dependencies
         script: |
-          # Use specific stable versions to avoid the "v8" error
+          # Use stable Capacitor 6 to match build machine capabilities
           npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/ios@6
           npm install
       - name: Web Assets Build
@@ -19,27 +19,29 @@ workflows:
           npm run build
       - name: Initialize and Sync iOS
         script: |
-          # This forces a fresh iOS project creation
+          # Complete reset to avoid workspace conflicts
           rm -rf ios
           npx cap add ios
           npx cap sync ios
           
-          # Crucial: This generates the .xcworkspace file you were missing
+          # Generate the essential .xcworkspace file
           cd ios/App
           pod install
       - name: iOS Build (Simulator version)
         script: |
           cd ios/App
-          # We use xcodebuild to create a .app file for virtual testing
+          # Target iPhone 17 as found in the server logs
           xcodebuild -workspace App.xcworkspace \
             -scheme App \
             -configuration Debug \
             -sdk iphonesimulator \
-            -destination 'platform=iOS Simulator,name=iPhone 15' \
+            -destination 'platform=iOS Simulator,name=iPhone 17' \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             clean build
     artifacts:
+      # This captures the .app folder needed for the Appetize emulator
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
       - ios/App/build/Release-iphonesimulator/*.app
       - /tmp/xcodebuild_logs/*.log
